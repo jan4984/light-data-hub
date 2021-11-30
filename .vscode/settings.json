@@ -1,0 +1,6 @@
+{
+    "mochaExplorer.files": "test/**/*.js",
+    "mochaExplorer.asyncOnly": true,
+    "mochaExplorer.exit": true,
+    "mochaExplorer.envPath": ".mytest.env"
+}

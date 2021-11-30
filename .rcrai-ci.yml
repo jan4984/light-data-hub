@@ -1,0 +1,3 @@
+include:
+- project: 'EfficientDeliver/Pipeline'
+  file: 'rcrai-standard-workflow.yml'

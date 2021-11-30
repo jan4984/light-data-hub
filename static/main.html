@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no" />
+    <title>太平打分</title>
+    <script type="text/javascript">
+        if (!localStorage.getItem('rcrai-taiping-scoring')) {
+            window.location.href = './login.html';
+        }
+    </script>
+    <link rel="icon" href="./icon.svg" sizes="any" type="image/svg+xml"/>
+    <script src="./react.production.min.js"></script>
+    <script src="./react-dom.production.min.js"></script>
+    <script src="./babel.min.js"></script>
+    <script src="./material-ui.production.min.js"></script>
+    <!-- Fonts to support Material Design -->
+    <link rel="stylesheet" href="./font.css" />
+    <!-- Icons to support Material Design -->
+    <link rel="stylesheet" href="./icon.css"/>
+    <script src="./axios.min.js"></script>
+</head>
+
+<body>
+    <div id='root'></div>
+</body>
+<script type="text/babel">
+
+    const {
+        Box,
+        Dialog,
+        DialogTitle,        
+        Alert,
+        TableContainer,
+        Table,
+        TableHead,
+        TableRow,
+        TableBody,
+        TableCell,
+        Link,
+        DialogActions,
+        Container,
+        Button,
+        InputLabel,
+        FormControl,
+        MenuItem,
+        TextField,
+        Paper,
+        Select,
+        Snackbar,
+    } = MaterialUI;
+
+    function NewTask(props) {
+        const [dlg, setDlg] = React.useState(false);
+        const [prd, setPrd] = React.useState('')
+        const [task, setTask] = React.useState('');
+        const [tasks, setTasks] = React.useState([]);
+        const [msg, setMsg] = React.useState('');
+
+        return <div><Box sx={{
+            display: ' flex',
+            justifyContent: 'right',
+            marginTop: 2,
+            marginBottom: 5,
+        }}>            
+            <Button variant="contained" onClick={async ()=>{
+                const tasks = await fetchTasks();
+                setTasks(tasks.filter(task=>task.status.progress<0&&task.running==false).map(task=>task.task));
+                setDlg(true);
+            }}>新建打分任务</Button>
+            <Button color="secondary" variant="contained" sx={{marginLeft:3 }} onClick={async ()=>{
+                localStorage.removeItem('rcrai-taiping-scoring');
+                window.location.href = './login.html';
+            }}>退出登录</Button>
+        </Box>
+        <Dialog open={dlg} onClose={()=>setDlg(false)} variant="outlined" fullWidth={true} maxWidth="sm">
+            <DialogTitle>新建打分任务</DialogTitle>
+            <FormControl sx={{margin:2}}>
+            <InputLabel id="task-label">任务名称</InputLabel>
+            <Select
+                labelId="task-label"
+                id="task"
+                value={task}
+                required={true}
+                label='任务名称'
+                onChange={e=>{
+                    setTask(e.target.value);
+                }}
+            >
+            {tasks.map(task=><MenuItem value={task}>{task}</MenuItem>)}
+            </Select>            
+            </FormControl>
+
+            <FormControl sx={{margin:2}}>
+            <InputLabel id="prd-label">产品类型</InputLabel>
+            <Select
+                labelId="prd-label"
+                id="prd"
+                required={true}
+                value={prd}
+                label='产品类型'
+                onChange={e=>{
+                    setPrd(e.target.value);
+                }}
+            >
+                <MenuItem value='人寿保险'>人寿保险</MenuItem>
+                <MenuItem value='年金保险'>年金保险</MenuItem>
+                <MenuItem value='健康保险'>健康保险</MenuItem>
+                <MenuItem value='意外伤害保险'>意外伤害保险</MenuItem>
+            </Select>            
+            </FormControl>
+            <DialogActions>
+                <Button onClick={async ()=>{
+                    if(!prd || !task) {
+                        setMsg('请先选择任务名称和产品类型');
+                        return;
+                    }
+                    await newTask({task, product:prd, onResult:(errMsg)=>{
+                        if(errMsg) setMsg(`创建任务错误:${errMsg}`);                            
+                        else setMsg('创建任务成功');
+                        setDlg(false);
+                    }});
+                    
+                }}>运行</Button>
+            </DialogActions>
+        </Dialog>
+        <Snackbar open={!!msg} anchorOrigin={{ vertical:'bottom', horizontal:'center' }}>
+                <Alert onClose={()=>setMsg('')} severity='error' sx={{width:'100%'}}>{msg}</Alert>
+            </Snackbar>
+        </div>
+    }
+
+    //for datagrid, but cdn not avalible x-data-grid
+    const columns = [
+        { field: 'name', headerName: '打分文件名称', sortable: true },
+        { field: 'product', headerName: '产品类型', sortable: true },
+        { field: 'start', headerName: '打分开始时间', sortable: true },
+        { field: 'end', headerName: '打分结束时间', sortable: true },
+        { field: 'status', headerName: '打分状态', sortable: true },
+        { field: 'op', headerName: '操作', sortable: false },
+    ];
+    
+    const productMap = {
+        '人寿保险':'renshoubaoxian','年金保险':'nianjinbaoxian','健康保险':'jiankangbaoxian','意外伤害保险':'yiwaibaoxian',
+        'renshoubaoxian':'人寿保险','nianjinbaoxian':'年金保险','jiankangbaoxian':'健康保险','yiwaibaoxian':'意外伤害保险'
+    }
+
+    async function downloadLog(task){
+        const resp = await axios.get(`/api/logs/${task}`,{
+            headers:{
+                authorization:localStorage.getItem('rcrai-taiping-scoring'),
+            }
+        });
+        const blob = new Blob([resp.data], { type: 'text/plain', encoding: 'UTF-8' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `taiping-scoring-${task}-log.txt`;
+        link.click();
+    }
+
+    async function newTask({task,product,onResult}){
+        const resp = await axios.post('/api/task', {task,product:productMap[product]||product}, {
+            headers:{
+                authorization:localStorage.getItem('rcrai-taiping-scoring'),
+            },
+            validateStatus:()=>true,
+        });
+        if(resp.status != 200){
+            onResult(resp.data.message || resp.data);
+            return;
+        }
+        onResult();
+    }
+
+    async function fetchTasks() {
+        const resp = await axios.get('/api/tasks',{
+            headers:{
+                authorization:localStorage.getItem('rcrai-taiping-scoring'),
+            }
+        }); 
+        return resp.data.tasks;
+    }
+
+    function Histories(props) {
+        //const [tasks, setTasks] = React.useState([{ name: '...', product: '...', start: '...', end: '...', status: '...'}]);              
+        const tasks = props.tasks;
+
+        return <TableContainer component={Paper}>
+            <Table sx={{ minWidth: '100%' }} aria-label="simple table">
+                <TableHead>
+                    <TableRow>
+                        {columns.map(c => <TableCell>{c.headerName}</TableCell>)}
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    {tasks.map(task =>
+                        <TableRow key={task.name} s x={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                            <TableCell>{task.name}</TableCell>
+                            <TableCell>{task.product}</TableCell>
+                            <TableCell>{task.start}</TableCell>
+                            <TableCell>{task.end}</TableCell>
+                            <TableCell>{task.status}</TableCell>
+                            <TableCell><Button onClick={()=>{
+                                downloadLog(task.name);
+                            }}>下载日志</Button></TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </TableContainer>
+    }
+    
+    (async function(){
+    const tasks = await fetchTasks();
+    tasks.sort((a,b)=>{
+        if(a.running) return -1;
+        if(b.running) return 1;
+        if(a.status.datetime && b.status.datetime){
+            return a.status.datetime.localeCompare(b.status.datetime);
+        }
+        if(!a.status.datetime && !b.status.datetime){
+            //console.log('debug',a.start, a.start.start);
+            return a.start.start.localeCompare(b.start.start);
+        }
+        return -(a.status.datetime.localeCompare(b.status.datetime));
+    });
+    const finalTasks = tasks.map(task=>{
+        const row = {
+            name: task.task,
+            product: productMap[task.start.product] || task.start.product,
+            start: task.start.start,
+        };
+        const procStatus = task.status.progress >=0 ? (task.running ? '进程运行中,' : '进程已停止,') : '';
+        row.status = `${procStatus}${task.status.status}${task.status.progress>=0?`,${task.status.progress}`:''}`;
+        row.end = task.status.datetime;
+        return row;
+    });            
+    ReactDOM.render(
+        <Container maxWidth="xl">
+            <NewTask />
+            <Histories tasks={finalTasks}/>
+        </Container>,
+        document.querySelector('#root')
+    );
+    })();
+
+</script>
+
+</html>

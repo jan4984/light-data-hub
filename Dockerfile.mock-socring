@@ -1,0 +1,6 @@
+FROM node:15-buster-slim
+WORKDIR /taiping_scoring
+COPY package.* ./
+RUN npm i --registry=https://registry.npm.taobao.org
+COPY ./mock-scoring.js ./
+ENTRYPOINT ["node", "mock-scoring.js"]

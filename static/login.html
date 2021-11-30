@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no"/>
+    <title>精准营销打分系统</title>
+    <link rel="icon" href="./icon.svg" sizes="any" type="image/svg+xml"/>
+    <script src="./react.production.min.js"></script>
+    <script src="./react-dom.production.min.js"></script>
+    <script src="./babel.min.js"></script>
+    <script src="./material-ui.production.min.js"></script>
+    <!-- Fonts to support Material Design -->
+    <link rel="stylesheet" href="./font.css" />
+    <!-- Icons to support Material Design -->
+    <link rel="stylesheet" href="./icon.css"/>
+    <script src="./axios.min.js"></script>
+</head>
+<body style="background-color: lightskyblue;">
+    <div id='root'></div>
+</body>
+<script type="text/babel">
+
+const {
+    Box,
+    Alert,
+    Container,
+    Button,
+    TextField,
+    Snackbar,
+} = MaterialUI;
+
+function Login(props){
+    const [msg, setMsg] = React.useState('');
+    const [user, setUser] = React.useState('');
+    const [pwd, setPwd] = React.useState('');
+
+    return <Container maxWidth="sm">
+        <Box sx={{
+            alignItems: 'center',
+            flexDirection: 'column',
+            display:' flex',
+            marginTop :8,
+        }}>
+            <img src="./log.svg"/>
+            <h2 style={{color: 'black'}}>精准营销打分系统</h2>
+            <TextField 
+                onChange={evt=>setUser(evt.target.value)} value={user} 
+                label='用户名' margin='normal' required={true} fullWidth={true}/>
+            <TextField 
+                onChange={evt=>setPwd(evt.target.value)} value={pwd} 
+                label='密码' margin='normal' type='password' required={true} fullWidth={true}/>
+            <Button variant="contained" onClick={async evt=>{
+                if(!user || !pwd){
+                    setMsg('请输入用户名密码');
+                    return;
+                }
+                try{
+                    const resp = await axios.post('/api/login', {password:pwd}, {
+                        validateStatus:()=>true,
+                    });
+                    if(!resp.data.token){
+                        setMsg(`登录失败:${resp.status} ${resp.data.message}`);
+                        return;
+                    }
+                    localStorage.setItem('rcrai-taiping-scoring', resp.data.token);
+                    window.location.href = './main.html';
+                    return;
+                }catch(e){
+                    setMsg(`登录失败:${e}`);
+                }
+
+            }}>登录</Button>
+            <Snackbar open={!!msg} anchorOrigin={{ vertical:'bottom', horizontal:'center' }}>
+                <Alert onClose={()=>setMsg('')} severity='error' sx={{width:'100%'}}>{msg}</Alert>
+            </Snackbar>
+        </Box>        
+    </Container>;
+}
+
+ReactDOM.render(
+    <Login/>,
+    document.querySelector('#root')
+);
+
+</script>
+</html>
