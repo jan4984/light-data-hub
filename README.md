@@ -4,7 +4,7 @@ for upload and share files
 
 ## browser
 
-chrome 86 and abover with [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API) support.
+for uploader, require chrome 86 and abover.
 
 ## config
 
