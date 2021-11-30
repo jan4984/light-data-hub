@@ -1,4 +1,4 @@
-# lightwight data hub
+# lightweight data hub
 
 for upload and share files
 

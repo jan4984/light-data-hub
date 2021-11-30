@@ -2,7 +2,6 @@
 CREATE TABLE "File" (
     "tinyUrl" TEXT NOT NULL,
     "fileName" TEXT NOT NULL,
-    "path" TEXT NOT NULL,
     "mime" TEXT NOT NULL,
     "ready" BOOLEAN NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -6,6 +6,7 @@ import express from "express";
 import morgan from 'morgan';
 import process from 'process';
 import fs from 'fs';
+import path from 'path';
 import mime from 'mime-types';
 import moment from 'moment-timezone';
 
@@ -21,15 +22,16 @@ export async function connect() {
     }
 }
 
-const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~()*!+$';
+const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
 function randomPlace() {
-    return [1, 2, 3, 4, 5].map(() => chars[Math.floor(Math.random() * chars.length)]).join();
+    return [1, 2, 3, 4, 5].map(() => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
 const withCatch = fn => {
     return function (req, res, next) {
         fn(req, res, next).catch(e => {
+            (res.closes || []).forEach(r=>r.close());
             console.log('ERROR', new Date());
             console.log(e.toString());
             console.log(e?.stack);
@@ -56,10 +58,9 @@ app.post('/data/', withCatch(async (req, res) => {
             item = await db.file.create({
                 data: {
                     fileName: req.query.fileName || 'file.bin',
-                    path: `${tinyUrl[0]}/${tinyUrl[1]}/tinyUrl`,
                     ready: false,
                     mime: req.query.mime || mime.contentType(req.query.fileName || 'file.bin'),
-                    tinyUrl,
+                    tinyUrl: req.query.tinyUrl || tinyUrl, //for test unique constraint
                 }
             });
             break;
@@ -68,21 +69,24 @@ app.post('/data/', withCatch(async (req, res) => {
                 console.log(new Date(), `url hash ${tinyUrl} conflict, re-generate`);
                 continue;
             }
-            break;
+            throw err;
         }
     }
-    fs.mkdirSync(`${tinyUrl[0]}/${tinyUrl[1]}`, { recursive: true });
+    fs.mkdirSync(path.join(process.env.FILE_PATH, `${tinyUrl[0]}/${tinyUrl[1]}`), { recursive: true });
     let onFinsh, onError;
     let p = new Promise((r, e) => { onFinsh = r; onError = e; });
-    req.pipe(fs.createWriteStream(path.join(process.env.DB_PATH, item.path)))
-        .on('end', () => onFinsh())
-        .on('error', (err) => onError(err));
+    const dest = fs.createWriteStream(path.join(process.env.FILE_PATH, `${tinyUrl[0]}/${tinyUrl[1]}/${item.tinyUrl}`));
+    res.closes = [dest];
+    req.pipe(dest);
+    req.on('end', () => onFinsh());
+    req.on('error', err => onError(err));
 
     await p;
     await db.file.update({
         where: { tinyUrl },
         data: { ready: true }
     });
+    item.ready=true;
     res.json(item).end();
 }));
 
@@ -94,15 +98,17 @@ app.get('/data/:tinyUrl', withCatch(async (req, res) => {
     res.set('content-disposition', `inline; filename="${item.fileName}"`);
     let onFinsh, onError;
     let p = new Promise((r, e) => { onFinsh = r; onError = e; });
-    fs.createReadStream(path.join(process.env.DB_PATH, item.path))
-        .on('end', () => onFinsh())
-        .on('error', (err) => onError(err));
+    const src = fs.createReadStream(path.join(process.env.FILE_PATH, `${item.tinyUrl[0]}/${item.tinyUrl[1]}/${item.tinyUrl}`));
+    res.closes = [src];
+    src.pipe(res);
+    src.on('end', () => onFinsh());
+    src.on('error', err => onError(err));
 
     await p;
     //res.end() should triggered by pipe's 'end' event
 }));
 
-if (process.argv[1].endsWith('main.js')) {
-    await connect();
+await connect();
+if (process.argv[1].endsWith('main.js')) {    
     app.listen(port, () => console.log(new Date(), `server at port ${port}`));
 }

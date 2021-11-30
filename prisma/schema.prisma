@@ -10,7 +10,6 @@ generator client {
 model File {
     tinyUrl String @unique
     fileName String
-    path String
     mime String
     ready Boolean
     createdAt DateTime @default(now())
