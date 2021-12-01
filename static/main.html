@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no"/>
+    <title>Light-weight Data Hub</title>    
+    <script src="./react.production.min.js"></script>
+    <script src="./react-dom.production.min.js"></script>
+    <script src="./babel.min.js"></script>
+    <script src="./material-ui.production.min.js"></script>
+    <script src="./qrcode.min.js"></script>
+    <!-- Fonts to support Material Design -->
+    <link rel="stylesheet" href="./font.css" />
+    <!-- Icons to support Material Design -->
+    <link rel="stylesheet" href="./icon.css"/>
+</head>
+<body style="background-color: lightskyblue;">
+    <div id='root'></div>
+    <input id='file' type='file' style='display:none'/>
+</body>
+<script type="text/babel">
+
+const {
+    Box,
+    Alert,
+    Container,
+    Button,
+    TextField,
+    Snackbar,
+    Divider,
+} = MaterialUI;
+
+function Login(props){
+    const [path, setPath] = React.useState('');
+    const [imgUrl, setImgUrl] = React.useState(window.location.href);
+    document.querySelector('#file').onchange = e=>{
+        console.log(e.target.files[0]?.name);
+        setPath(e.target.files[0]?.name);
+        //setImgUrl(e.target.files[0]?.name || window.location.href);
+    };
+
+    return <Container maxWidth="sm">
+        <Box sx={{
+            alignItems: 'center',
+            flexDirection: 'column',
+            display:' flex',
+            marginTop :8,
+        }}>
+            <h2 style={{color: 'black'}}>Light-weight Data Hub</h2>
+            <div><span sx={{margin:2}}>{path?path:'NO FILE SELECTION'}</span></div>
+            <Button sx={{margin:2}} variant="contained" onClick={ async evt=>{
+                document.querySelector('#file').click();
+            }}>Select File</Button>
+            <Button sx={{margin:2}} disabled={!path} variant="contained" color="secondary" onClick={async evt=>{
+                const fd = new FormData();
+                const file = document.querySelector('#file').files[0];
+                if(!file) {
+                    console.log('should be disabled');
+                    return;
+                }
+                fd.append('form-input-name', file, file.name);
+                const url=new URL('/data/', window.location.href);
+                url.searchParams.append('fileName', file.name);
+                const resp = await fetch(url, {method:'POST', body: fd});
+                const respJ = await resp.json();
+                setImgUrl(new URL(`/data/${respJ.tinyUrl}`, window.location.href).toString());
+            }}>Upload</Button>
+            <Divider light={false}/>
+            <div dangerouslySetInnerHTML={{ __html: new QRCode(imgUrl).svg() }} />
+            <div><span sx={{margin:2}}>{imgUrl}</span></div>
+        </Box>        
+    </Container>;
+}
+
+ReactDOM.render(
+    <Login/>,
+    document.querySelector('#root')
+);
+
+</script>
+</html>

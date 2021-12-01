@@ -58,13 +58,14 @@ app.post('/data/', withCatch(async (req, res) => {
         const p = new Promise((r_, e_) => { r = r_; e = e_; });
         upload(req, res, err => {
             if (err){
-                console.log(new Date(), "upload error", err);
+                console.log(new Date(), `upload error ${err}`);
                 e(err)
             }
             else
                 r()
         });
         await p;
+        console.log(new Date(), `req.files:${req.file.path}`);
     }
     let tinyUrl, item;
     tinyUrl = req.query.tinyUrl || randomPlace();    
@@ -74,7 +75,7 @@ app.post('/data/', withCatch(async (req, res) => {
                 data: {
                     fileName: req.query.fileName || 'file.bin',
                     ready: false,
-                    mime: req.query.mime || mime.contentType(req.query.fileName || 'file.bin'),
+                    mime: req.query.mime || mime.contentType(req.query.fileName || 'file.bin') || 'application/octet-stream',
                     tinyUrl,
                 }
             });
