@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: '.mytest.env' });
 import PrismaClient from '@prisma/client';
+import multer from 'multer';
 import { createHmac } from "crypto";
 import express from "express";
 import morgan from 'morgan';
@@ -8,7 +9,6 @@ import process from 'process';
 import fs from 'fs';
 import path from 'path';
 import mime from 'mime-types';
-import moment from 'moment-timezone';
 
 export const db = new PrismaClient.PrismaClient({ log: ['query'] });
 export async function connect() {
@@ -31,7 +31,7 @@ function randomPlace() {
 const withCatch = fn => {
     return function (req, res, next) {
         fn(req, res, next).catch(e => {
-            (res.closes || []).forEach(r=>r.close());
+            (res.closes || []).forEach(r => r.close());
             console.log('ERROR', new Date());
             console.log(e.toString());
             console.log(e?.stack);
@@ -50,7 +50,22 @@ app.get('/healthz', (r_, res) => {
     res.status(200).end();
 });
 
+const upload = multer({ dest: '/tmp/lhd-multer-tmp-files/' }).single('form-input-name');
+
 app.post('/data/', withCatch(async (req, res) => {
+    {
+        let r, e;
+        const p = new Promise((r_, e_) => { r = r_; e = e_; });
+        upload(req, res, err => {
+            if (err){
+                console.log(new Date(), "upload error", err);
+                e(err)
+            }
+            else
+                r()
+        });
+        await p;
+    }
     let tinyUrl, item;
     while (true) {
         try {
@@ -73,20 +88,21 @@ app.post('/data/', withCatch(async (req, res) => {
         }
     }
     fs.mkdirSync(path.join(process.env.FILE_PATH, `${tinyUrl[0]}/${tinyUrl[1]}`), { recursive: true });
-    let onFinsh, onError;
-    let p = new Promise((r, e) => { onFinsh = r; onError = e; });
-    const dest = fs.createWriteStream(path.join(process.env.FILE_PATH, `${tinyUrl[0]}/${tinyUrl[1]}/${item.tinyUrl}`));
-    res.closes = [dest];
-    req.pipe(dest);
-    req.on('end', () => onFinsh());
-    req.on('error', err => onError(err));
+    fs.renameSync(req.file.path, path.join(process.env.FILE_PATH, `${tinyUrl[0]}/${tinyUrl[1]}/${tinyUrl}`));
+    // let onFinsh, onError;
+    // let p = new Promise((r, e) => { onFinsh = r; onError = e; });
+    // const dest = fs.createWriteStream(path.join(process.env.FILE_PATH, `${tinyUrl[0]}/${tinyUrl[1]}/${item.tinyUrl}`));
+    // res.closes = [dest];
+    // req.pipe(dest);
+    // req.on('end', () => onFinsh());
+    // req.on('error', err => onError(err));
+    //await p;
 
-    await p;
     await db.file.update({
         where: { tinyUrl },
         data: { ready: true }
     });
-    item.ready=true;
+    item.ready = true;
     res.json(item).end();
 }));
 
@@ -109,6 +125,6 @@ app.get('/data/:tinyUrl', withCatch(async (req, res) => {
 }));
 
 await connect();
-if (process.argv[1].endsWith('main.js')) {    
+if (process.argv[1].endsWith('main.js')) {
     app.listen(port, () => console.log(new Date(), `server at port ${port}`));
 }
