@@ -67,21 +67,23 @@ app.post('/data/', withCatch(async (req, res) => {
         await p;
     }
     let tinyUrl, item;
+    tinyUrl = req.query.tinyUrl || randomPlace();    
     while (true) {
         try {
-            tinyUrl = randomPlace();
             item = await db.file.create({
                 data: {
                     fileName: req.query.fileName || 'file.bin',
                     ready: false,
                     mime: req.query.mime || mime.contentType(req.query.fileName || 'file.bin'),
-                    tinyUrl: req.query.tinyUrl || tinyUrl, //for test unique constraint
+                    tinyUrl,
                 }
             });
             break;
         } catch (err) {
             if (err.code == 'P2002') {
-                console.log(new Date(), `url hash ${tinyUrl} conflict, re-generate`);
+                const old = tinyUrl;
+                tinyUrl = randomPlace();
+                console.log(new Date(), `url hash ${old} conflict, re-generate: ${tinyUrl}`);                
                 continue;
             }
             throw err;
